@@ -142,7 +142,7 @@ def rename_file(file_):
     file_.rename(target)
 
 
-if __name__ == '__main__':
+def main():
     try:
         path = pathlib.Path(sys.argv[1])
     except IndexError as error:
@@ -170,3 +170,7 @@ if __name__ == '__main__':
     # EXIF created time, preventing future renames to push the name further
     # from the real create date
     print(len(files), 'files renamed.')
+
+
+if __name__ == '__main__':
+    pass
