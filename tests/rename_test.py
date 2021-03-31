@@ -261,7 +261,7 @@ def copy_sample_n_times(times):
     """Copy SAMPLES/sample 1.jpg to TESTS n times."""
 
     for index in range(times):
-        target = TESTS / f'sample {index}.jpg'
+        target = TESTS / f'sample {index + 1}.jpg'
         shutil.copy2(SAMPLES / 'sample 1.jpg', target)
 
 
@@ -307,5 +307,27 @@ class TestFileManager:
         duplicates = file_manager.find_duplicates()
 
         assert len(duplicates) == 0
+
+        clean_up()
+
+    @staticmethod
+    def test_delete_duplicate_before_remove():
+        """Ensures that FileManager.delete_duplicate will raise
+        rename.DuplicateNotRemovedError with the correct message if the user
+        attempts to delete a duplicate file that was not first removed from
+        FileManager.files"""
+
+        copy_sample_n_times(2)
+        file_manager = rename.FileManager(TESTS)
+        duplicates = file_manager.find_duplicates()
+
+        with pytest.raises(rename.DuplicateNotRemovedError) as error:
+            file_manager.delete_duplicates(duplicates)
+
+        message = (f'Remove {duplicates[0].path} from FileManager.files with '
+                   'FileManager.remove_duplicates before attempting to '
+                   'deleting it.')
+
+        assert error.value.args[0] == message
 
         clean_up()

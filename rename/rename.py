@@ -218,6 +218,12 @@ class File:
         return date.strftime('%Y%m%d %H%M%S %z')
 
 
+class DuplicateNotRemovedError(Exception):
+    """Exception raised when the user attempts to delete a duplicate that was
+    not removed from FileManager.files."""
+    pass
+
+
 @dataclasses.dataclass
 class FileManager:
     """Manages File instances."""
@@ -249,16 +255,32 @@ class FileManager:
         return duplicates
 
     def remove_duplicates(self, duplicates):
-        """Removes duplicate files from FileManager.files member, preventing
-        them to be renamed in the future."""
+        """Removes duplicate files from FileManager.files, preventing them
+        to be renamed in the future."""
 
         for duplicate in duplicates:
             self.files.remove(duplicate)
 
+    def delete_duplicates(self, duplicates):
+        """Deletes duplicate files. Raise DuplicateNotRemovedError if the
+        duplicate is an element of FileManager.files."""
+
+        for duplicate in duplicates:
+            if duplicate in self.files:
+                message = (f'Remove {duplicate.path} from '
+                           'FileManager.files with '
+                           'FileManager.remove_duplicates before attempting to '
+                           'deleting it.')
+                raise DuplicateNotRemovedError(message)
+            else:
+                os.remove(duplicate.path)
+
 
 if __name__ == '__main__':
     # TODO: Test if the path exists before instanciate FileManager
-    file_manager = FileManager(sys.argv[1])
+    path = pathlib.Path(sys.argv[1])
+    file_manager = FileManager(path)
     duplicates = file_manager.find_duplicates()
     # TODO: Prompt the user to delete the duplicates found
     file_manager.remove_duplicates(duplicates)
+    file_manager.delete_duplicates(duplicates)
