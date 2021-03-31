@@ -1,3 +1,4 @@
+import dataclasses
 import datetime
 import hashlib
 import os
@@ -170,6 +171,51 @@ def main():
     # EXIF created time, preventing future renames to push the name further
     # from the real create date
     print(len(files), 'files renamed.')
+
+
+@dataclasses.dataclass
+class File:
+    """Keeps track of the path, hash and date of creation of a file."""
+
+    path: pathlib.Path
+    hash_: int = dataclasses.field(init=False)
+    date: datetime.datetime = dataclasses.field(init=False)
+
+    def __post_init__(self):
+        self.hash_ = File.get_hash(self.path)
+        self.date = File.get_date(self.path)
+
+    @staticmethod
+    def get_hash(path):
+        """Hashes the file using the built-in hash function."""
+
+        with path.open(mode='rb') as file_:
+            bytes_ = file_.read()
+
+        return hash(bytes_)
+
+    @staticmethod
+    def get_date(path):
+        """Uses Exiftool to extract the file's create date or, if the file does
+        not have exif info, gets the last time its metadata was modified."""
+
+        # TODO: check if the user has exiftool installed before starting to do
+        # all the work. Delete this comment after implementing the checking
+        # function
+        args = ['exiftool', path, '-CreateDate', '-s', '-s', '-s']
+        process = subprocess.run(args, capture_output=True)
+        date_str = process.stdout.decode('utf-8')
+
+        stamp = path.stat().st_ctime
+
+        try:
+            date = datetime.datetime.strptime(date_str, '%Y:%m:%d %H:%M:%S\n')
+        except ValueError:
+            date = datetime.datetime.fromtimestamp(stamp)
+
+        date = LOCAL_TZ.localize(date)
+
+        return date.strftime('%Y%m%d %H%M%S %z')
 
 
 if __name__ == '__main__':

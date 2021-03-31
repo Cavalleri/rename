@@ -246,3 +246,15 @@ def test_rename_3_samples(sample_1_create_date):
 
     for index, sample in enumerate(samples):
         assert sample.stem == f'{sample_1_create_date} {index + 1}'
+
+
+class TestFile:
+    """Contains rename.File's methods tests."""
+
+    @staticmethod
+    def test_get_date(sample_1_create_date):
+        """Verifies if rename.File.get_date correctly extracts and formats
+        the sample's create date using Exiftool."""
+
+        date = rename.File.get_date(SAMPLES / 'sample 1.jpg')
+        assert date == sample_1_create_date
