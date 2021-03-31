@@ -309,7 +309,3 @@ class TestFileManager:
         assert len(duplicates) == 0
 
         clean_up()
-
-    # @staticmethod
-    # def test_remove_duplicates():
-    #     copy_samples()

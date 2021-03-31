@@ -248,7 +248,17 @@ class FileManager:
 
         return duplicates
 
+    def remove_duplicates(self, duplicates):
+        """Removes duplicate files from FileManager.files member, preventing
+        them to be renamed in the future."""
+
+        for duplicate in duplicates:
+            self.files.remove(duplicate)
+
 
 if __name__ == '__main__':
+    # TODO: Test if the path exists before instanciate FileManager
     file_manager = FileManager(sys.argv[1])
     duplicates = file_manager.find_duplicates()
+    # TODO: Prompt the user to delete the duplicates found
+    file_manager.remove_duplicates(duplicates)
