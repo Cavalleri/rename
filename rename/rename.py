@@ -234,6 +234,21 @@ class FileManager:
 
         return [File(file_) for file_ in path.iterdir() if file_.is_file()]
 
+    def find_duplicates(self):
+        """Compares the hash of File instances to find identical copies."""
+
+        hashes = []
+        duplicates = []
+
+        for file_ in self.files:
+            if file_.hash_ in hashes:
+                duplicates.append(file_)
+            else:
+                hashes.append(file_.hash_)
+
+        return duplicates
+
 
 if __name__ == '__main__':
-    pass
+    file_manager = FileManager(sys.argv[1])
+    duplicates = file_manager.find_duplicates()

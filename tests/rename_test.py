@@ -13,7 +13,7 @@ SAMPLES = TESTS / 'samples'
 
 
 def clean_up():
-    """Removes all JPG files in the tests directory."""
+    """Removes all .jpg file in TESTS."""
 
     for file_ in TESTS.iterdir():
         if file_.suffix == '.jpg':
@@ -249,7 +249,7 @@ def test_rename_3_samples(sample_1_create_date):
 
 
 class TestFile:
-    """Contains rename.File's methods tests."""
+    """Contains rename.File tests."""
 
     @staticmethod
     def test_get_date(sample_1_create_date):
@@ -258,3 +258,43 @@ class TestFile:
 
         date = rename.File.get_date(SAMPLES / 'sample 1.jpg')
         assert date == sample_1_create_date
+
+
+class TestFileManager:
+    """Contains rename.FileManager tests."""
+
+    @staticmethod
+    def test_find_duplicates_all_duplicates():
+        """Asserts if rename.FileManager.find_duplicates correctly indentifies
+        all the copies of the same file as duplicate."""
+
+        num_copies = 5
+
+        for index in range(num_copies):
+            target = TESTS / f'sample {index}.jpg'
+            shutil.copy2(SAMPLES / 'sample 1.jpg', target)
+
+        file_manager = rename.FileManager(TESTS)
+        duplicates = file_manager.find_duplicates()
+
+        # One copy will be considered as the original
+        assert len(duplicates) == num_copies - 1
+
+        clean_up()
+
+    @staticmethod
+    def test_find_duplicates_no_duplicate():
+        """Asserts if rename.FileManager.find_duplicates correctly indentifies
+        all the copies of the same file as duplicate."""
+
+        # It is not necesssary to check if file_ is a file because SAMPLES
+        # must contain only files
+        for file_ in SAMPLES.iterdir():
+            shutil.copy2(file_, TESTS)
+
+        file_manager = rename.FileManager(TESTS)
+        duplicates = file_manager.find_duplicates()
+
+        assert len(duplicates) == 0
+
+        clean_up()
