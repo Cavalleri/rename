@@ -218,5 +218,22 @@ class File:
         return date.strftime('%Y%m%d %H%M%S %z')
 
 
+@dataclasses.dataclass
+class FileManager:
+    """Manages File instances."""
+
+    path: pathlib.Path
+    files: list = dataclasses.field(init=False)
+
+    def __post_init__(self):
+        self.files = FileManager.list_files(self.path)
+
+    @staticmethod
+    def list_files(path):
+        """Lists all files in the given directory as File instances."""
+
+        return [File(file_) for file_ in path.iterdir() if file_.is_file()]
+
+
 if __name__ == '__main__':
     pass
