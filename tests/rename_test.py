@@ -248,6 +248,23 @@ def test_rename_3_samples(sample_1_create_date):
         assert sample.stem == f'{sample_1_create_date} {index + 1}'
 
 
+def copy_samples():
+    """Copy all the samples in SAMPLES to TESTS."""
+
+    # It is not necesssary to check if file_ is a file because SAMPLES
+    # must contain only files
+    for file_ in SAMPLES.iterdir():
+        shutil.copy2(file_, TESTS)
+
+
+def copy_sample_n_times(times):
+    """Copy SAMPLES/sample 1.jpg to TESTS n times."""
+
+    for index in range(times):
+        target = TESTS / f'sample {index}.jpg'
+        shutil.copy2(SAMPLES / 'sample 1.jpg', target)
+
+
 class TestFile:
     """Contains rename.File tests."""
 
@@ -269,10 +286,7 @@ class TestFileManager:
         all the copies of the same file as duplicate."""
 
         num_copies = 5
-
-        for index in range(num_copies):
-            target = TESTS / f'sample {index}.jpg'
-            shutil.copy2(SAMPLES / 'sample 1.jpg', target)
+        copy_sample_n_times(num_copies)
 
         file_manager = rename.FileManager(TESTS)
         duplicates = file_manager.find_duplicates()
@@ -287,10 +301,7 @@ class TestFileManager:
         """Asserts if rename.FileManager.find_duplicates correctly indentifies
         all the copies of the same file as duplicate."""
 
-        # It is not necesssary to check if file_ is a file because SAMPLES
-        # must contain only files
-        for file_ in SAMPLES.iterdir():
-            shutil.copy2(file_, TESTS)
+        copy_samples()
 
         file_manager = rename.FileManager(TESTS)
         duplicates = file_manager.find_duplicates()
@@ -298,3 +309,7 @@ class TestFileManager:
         assert len(duplicates) == 0
 
         clean_up()
+
+    # @staticmethod
+    # def test_remove_duplicates():
+    #     copy_samples()
