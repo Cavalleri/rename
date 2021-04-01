@@ -281,12 +281,34 @@ class TestFile:
     """Contains rename.File tests."""
 
     @staticmethod
-    def test_get_date(sample_1_create_date):
-        """Verifies if rename.File.get_date correctly extracts and formats
-        the sample's create date using Exiftool."""
+    def test_get_date(samples_create_date):
+        """Verifies if rename.File.get_date correctly extracts sample's create
+        date using Exiftool."""
 
         date = rename.File.get_date(SAMPLES / 'sample 1.jpg')
-        assert date == sample_1_create_date
+        date = date.strftime('%Y%m%d %H%M%S %z')
+
+        assert date == samples_create_date[0]
+
+    @staticmethod
+    def test_get_target(samples_create_date):
+        """Ensures File.get_target correctly makes File.target."""
+
+        file_ = rename.File(SAMPLES / 'sample 1.jpg')
+        target = SAMPLES / f'{samples_create_date[0]} 1.jpg'
+
+        assert file_.target == target
+
+    @staticmethod
+    def test_increment_target(samples_create_date):
+        """Tests if File.increment_target correctly increments File.index and
+        remakes File.target."""
+
+        file_ = rename.File(SAMPLES / 'sample 1.jpg')
+        file_.increment_target()
+        target = SAMPLES / f'{samples_create_date[0]} 2.jpg'
+
+        assert file_.target == target
 
 
 class TestFileManager:
@@ -297,14 +319,14 @@ class TestFileManager:
         """Asserts if rename.FileManager.find_duplicates correctly indentifies
         all the copies of the same file as duplicate."""
 
-        num_copies = 5
-        copy_sample_n_times(num_copies)
+        copies = 5
+        copy_sample_n_times(copies)
 
         file_manager = rename.FileManager(TESTS)
         duplicates = file_manager.find_duplicates()
 
         # One copy will be considered as the original
-        assert len(duplicates) == num_copies - 1
+        assert len(duplicates) == copies - 1
 
         clean_up()
 
@@ -341,5 +363,50 @@ class TestFileManager:
                    'deleting it.')
 
         assert error.value.args[0] == message
+
+        clean_up()
+
+    @staticmethod
+    def test_resolve_targets_all_duplicates(samples_create_date):
+        """Tests if FileManager.resolve_targets correctly increments the
+        targets when all samples are duplicates."""
+
+        copies = 5
+        copy_sample_n_times(copies)
+
+        file_manager = rename.FileManager(TESTS)
+        file_manager.resolve_targets()
+
+        result = [file_.target for file_ in file_manager.files
+                  if file_.path.suffix == '.jpg']
+
+        expected = []
+        for index in range(copies):
+            path = TESTS / f'{samples_create_date[0]} {index + 1}.jpg'
+            expected.append(path)
+
+        assert sorted(result) == sorted(expected)
+
+        clean_up()
+
+    @staticmethod
+    def test_resolve_targets_all_uniques(samples_create_date):
+        """Tests if FileManager.resolve_targets correctly classifies all
+        samples target as unique."""
+
+        copy_samples()
+
+        file_manager = rename.FileManager(TESTS)
+        file_manager.resolve_targets()
+
+        result = [file_.target for file_ in file_manager.files
+                  if file_.path.suffix == '.jpg']
+
+        expected = []
+        for create_date in samples_create_date:
+            path = TESTS / f'{create_date}.jpg'
+            expected.append(path)
+
+        assert sorted(result) == sorted(expected)
 
         clean_up()

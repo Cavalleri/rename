@@ -175,15 +175,18 @@ def main():
 
 @dataclasses.dataclass
 class File:
-    """Keeps track of the path, hash and date of creation of a file."""
+    """Keeps track of the path, hash, date of creation and name of a file."""
 
     path: pathlib.Path
     hash_: int = dataclasses.field(init=False)
     date: datetime.datetime = dataclasses.field(init=False)
+    target: pathlib.Path = dataclasses.field(init=False)
+    index: int = 1
 
     def __post_init__(self):
         self.hash_ = File.get_hash(self.path)
         self.date = File.get_date(self.path)
+        self.target = self.get_target()
 
     @staticmethod
     def get_hash(path):
@@ -215,7 +218,26 @@ class File:
 
         date = LOCAL_TZ.localize(date)
 
-        return date.strftime('%Y%m%d %H%M%S %z')
+        return date
+
+    def get_target(self, unique=False):
+        """Makes the target path used to rename the file later. If unique is
+        True, File.index will not be appended to File.target."""
+
+        date = self.date.strftime('%Y%m%d %H%M%S %z')
+
+        if unique:
+            name = f'{date}{self.path.suffix}'
+        else:
+            name = f'{date} {self.index}{self.path.suffix}'
+
+        return self.path.parent / name
+
+    def increment_target(self):
+        """Increments File.index and remakes File.target."""
+
+        self.index += 1
+        self.target = self.get_target()
 
 
 class DuplicateNotRemovedError(Exception):
@@ -275,6 +297,28 @@ class FileManager:
             else:
                 os.remove(duplicate.path)
 
+    def resolve_targets(self):
+        """Resolve targets collisions by incrementing indexes and finding
+        unique names."""
+
+        targets = []
+
+        for file_ in self.files:
+            while file_.target in targets:
+                file_.increment_target()
+
+            targets.append(file_.target)
+
+        # Verify if the name of the file is unique or if its the first of a
+        # sequence of incrementing names.
+        for file_ in self.files:
+            if file_.index == 1:
+                name = f'{file_.target.stem[:-1]}2{file_.target.suffix}'
+                target = file_.target.parent / name
+
+                if target not in targets:
+                    file_.target = file_.get_target(unique=True)
+
 
 if __name__ == '__main__':
     # TODO: Test if the path exists before instanciate FileManager
@@ -284,3 +328,6 @@ if __name__ == '__main__':
     # TODO: Prompt the user to delete the duplicates found
     file_manager.remove_duplicates(duplicates)
     file_manager.delete_duplicates(duplicates)
+    # TODO: Explore the possibility of inject exif info into files that does
+    # not have it already
+    file_manager.resolve_targets()
