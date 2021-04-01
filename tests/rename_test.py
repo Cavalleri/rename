@@ -149,9 +149,10 @@ def test_create_date_with_exif():
     assert create_date == datetime.datetime(2008, 5, 30, 15, 56, 1)
 
 
-def test_create_date_without_exif():
-    with pytest.raises(ValueError):
-        rename.get_create_date(SAMPLES / 'sample 6.jpg')
+# NOTE: This test was removed to allow the removal of sample 6.jpg from SAMPLES
+# def test_create_date_without_exif():
+#     with pytest.raises(ValueError):
+#         rename.get_create_date(SAMPLES / 'sample 6.jpg')
 
 
 def test_create_date_no_exiftool(capsys):
