@@ -178,46 +178,57 @@ def test_create_date_no_exiftool(capsys):
 
 
 @pytest.fixture
-def sample_1_create_date():
-    """Localize the sample 1 create date based on the user's time zone."""
+def samples_create_date():
+    """Localize the sample create date based on the user's time zone."""
 
-    # NOTE: I don't know why, but providing tz_info to datetime set the time
-    # zone off by a few minutes
     tz_info = pytz.timezone('America/Sao_Paulo')
-    date = datetime.datetime(2008, 5, 30, 15, 56, 1)
-    date = tz_info.localize(date)
-    date = date.astimezone(rename.LOCAL_TZ)
+    create_dates = (
+        (2008, 5, 30, 15, 56, 1),
+        (2008, 5, 4, 16, 47, 24),
+        (2004, 8, 27, 13, 52, 55),
+        (2001, 2, 19, 6, 40, 5),
+        (2006, 10, 22, 15, 44, 29)
+    )
 
-    return date.strftime('%Y%m%d %H%M%S %z')
+    dates = []
+    for create_date in create_dates:
+        # NOTE: I don't know why, but providing tz_info to datetime set the time
+        # zone off by a few minutes
+        date = datetime.datetime(*create_date)
+        date = tz_info.localize(date)
+        date = date.astimezone(rename.LOCAL_TZ)
+        dates.append(date.strftime('%Y%m%d %H%M%S %z'))
+
+    return dates
 
 
-def test_get_name(sample_1_create_date):
+def test_get_name(samples_create_date):
     """Tests if rename.test_get_name correctly gets the name of a sample that
     has EXIF information."""
 
     name = rename.get_name(SAMPLES / 'sample 1.jpg')
-    assert name == sample_1_create_date
+    assert name == samples_create_date[0]
 
 
-def test_get_target_no_counter(sample_1_create_date):
+def test_get_target_no_counter(samples_create_date):
     """Tests if rename.get_target correctly builds the target path to rename
     the sample."""
 
     sample_1 = pathlib.Path(SAMPLES / 'sample 1.jpg')
     target = rename.get_target(sample_1)
-    assert target == SAMPLES / (sample_1_create_date + '.jpg')
+    assert target == SAMPLES / (samples_create_date[0] + '.jpg')
 
 
-def test_get_target_with_counter(sample_1_create_date):
+def test_get_target_with_counter(samples_create_date):
     """Tests if rename.get_target correctly builds the target path to rename
     the sample if counter is given."""
 
     sample_1 = pathlib.Path(SAMPLES / 'sample 1.jpg')
     target = rename.get_target(sample_1, 1)
-    assert target == SAMPLES / (sample_1_create_date + ' 1.jpg')
+    assert target == SAMPLES / (samples_create_date[0] + ' 1.jpg')
 
 
-def test_rename_1_sample(sample_1_create_date):
+def test_rename_1_sample(samples_create_date):
     """Tests if rename.rename_file correctly renames a single sample."""
 
     shutil.copy2(SAMPLES / 'sample 1.jpg', TESTS)
@@ -227,7 +238,7 @@ def test_rename_1_sample(sample_1_create_date):
 
     clean_up()
 
-    assert sample_1.stem == sample_1_create_date
+    assert sample_1.stem == samples_create_date[0]
 
 
 def test_rename_3_samples(sample_1_create_date):
