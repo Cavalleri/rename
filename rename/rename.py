@@ -173,7 +173,7 @@ def main():
     print(len(files), 'files renamed.')
 
 
-@dataclasses.dataclass
+@dataclasses.dataclass(order=True)
 class File:
     """Keeps track of the path, hash, date of creation and name of a file."""
 
@@ -275,7 +275,7 @@ class FileManager:
             message = f'{self.path} has no file to be rename.'
             raise NoFileToRenameError(message)
         else:
-            self.files = files
+            self.files = sorted(files)
 
     @staticmethod
     def list_files(path):
@@ -364,15 +364,45 @@ class FileManager:
         self.files.clear()
 
 
+def list_duplicates(duplicates):
+    """Prints a list of all duplicate files found."""
+
+    if len(duplicates) == 0:
+        print('No duplicate file was found')
+    else:
+        print('Found the following duplicate files:')
+
+        for duplicate in duplicates:
+            print(duplicate.path)
+
+
+def prompt_user(message):
+    """Prompts the user to answer yes or no for the given message."""
+
+    return True if input(message) == 'y' else False
+
+
 if __name__ == '__main__':
     # TODO: Test if the path exists before instanciate FileManager
     path = pathlib.Path(sys.argv[1])
     file_manager = FileManager(path)
+
     duplicates = file_manager.find_duplicates()
-    # TODO: Prompt the user to delete the duplicates found
-    file_manager.remove_duplicates(duplicates)
-    file_manager.delete_duplicates(duplicates)
+    list_duplicates(duplicates)
+
+    if len(duplicates) != 0 and prompt_user('Delete duplicate files? (y/n) '):
+        file_manager.remove_duplicates(duplicates)
+        file_manager.delete_duplicates(duplicates)
+
+        print(f'{len(duplicates)} duplicate files deleted.')
+    else:
+        print('No duplicate file was removed.')
+
+    file_number = len(file_manager.files)
+
     # TODO: Explore the possibility of inject exif info into files that does
     # not have it already
     file_manager.resolve_targets()
     file_manager.rename_files()
+
+    print(f'Renamed {file_number} files.')

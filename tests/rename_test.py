@@ -278,6 +278,31 @@ def copy_sample_n_times(times):
         shutil.copy2(SAMPLES / 'sample 1.jpg', target)
 
 
+def test_list_duplicates(capsys):
+    """Tests if rename.list_duplicates outputs as expected."""
+
+    samples = [rename.File(sample) for sample in SAMPLES.iterdir()]
+    rename.list_duplicates(sorted(samples))
+
+    captured = capsys.readouterr()
+
+    expected = 'Found the following duplicate files:\n'
+    for index in range(len(samples)):
+        expected += f'tests/samples/sample {index + 1}.jpg\n'
+
+    assert captured.out == expected
+
+
+def test_list_duplicates_no_duplicates(capsys):
+    """Tests if rename.list_duplicates outputs as expected when the duplicates
+    list is empty."""
+
+    rename.list_duplicates([])
+    captured = capsys.readouterr()
+
+    assert captured.out == 'No duplicate file was found\n'
+
+
 class TestFile:
     """Contains rename.File tests."""
 
