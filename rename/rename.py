@@ -10,6 +10,25 @@ import tzlocal
 LOCAL_TZ = tzlocal.get_localzone()
 
 
+class DuplicateNotRemovedError(Exception):
+    """Exception raised when the user attempts to delete a duplicate file that
+    was not removed from FileManager.files."""
+    pass
+
+
+class TargetNotResolvedError(Exception):
+    """Exception raised when the user attempts to rename files before calling
+    FileManager.resolve_targets."""
+    pass
+
+
+class NoFileToRenameError(Exception):
+    """Exception raised when FileManager.files is empty because it was depleted
+    by previously calling FileManager.rename_files or because the given
+    directory has no files to rename."""
+    pass
+
+
 @dataclasses.dataclass(order=True)
 class File:
     """Keeps track of the path, hash, date of creation and name of a file."""
@@ -76,25 +95,6 @@ class File:
 
         self.index += 1
         self.target = self.get_target()
-
-
-class DuplicateNotRemovedError(Exception):
-    """Exception raised when the user attempts to delete a duplicate that was
-    not removed from FileManager.files."""
-    pass
-
-
-class TargetNotResolvedError(Exception):
-    """Exception raised when the user attempts to rename files before calling
-    FileManager.resolve_targets."""
-    pass
-
-
-class NoFileToRenameError(Exception):
-    """Exception raised when FileManager.files is empty because it was depleted
-    by previously calling FileManager.rename_files or because the given
-    directory has no files to rename."""
-    pass
 
 
 @dataclasses.dataclass
@@ -220,7 +220,6 @@ def prompt_user(message):
 
 
 if __name__ == '__main__':
-    # TODO: Test if the path exists before instanciate FileManager
     path = pathlib.Path(sys.argv[1])
     file_manager = FileManager(path)
 
