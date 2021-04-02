@@ -182,6 +182,7 @@ class File:
     date: datetime.datetime = dataclasses.field(init=False)
     target: pathlib.Path = dataclasses.field(init=False)
     index: int = 1
+    resolved: bool = dataclasses.field(default=False, init=False)
 
     def __post_init__(self):
         self.hash_ = File.get_hash(self.path)
@@ -222,7 +223,7 @@ class File:
 
     def get_target(self, unique=False):
         """Makes the target path used to rename the file later. If unique is
-        True, File.index will not be appended to File.target."""
+        True, File.index will not be appended to the path stem."""
 
         date = self.date.strftime('%Y%m%d %H%M%S %z')
 
@@ -246,6 +247,19 @@ class DuplicateNotRemovedError(Exception):
     pass
 
 
+class TargetNotResolvedError(Exception):
+    """Exception raised when the user attempts to rename files before calling
+    FileManager.resolve_targets."""
+    pass
+
+
+class NoFileToRenameError(Exception):
+    """Exception raised when FileManager.files is empty because it was depleted
+    by previously calling FileManager.rename_files or because the given
+    directory has no files to rename."""
+    pass
+
+
 @dataclasses.dataclass
 class FileManager:
     """Manages File instances."""
@@ -254,7 +268,14 @@ class FileManager:
     files: list = dataclasses.field(init=False)
 
     def __post_init__(self):
-        self.files = FileManager.list_files(self.path)
+        files = FileManager.list_files(self.path)
+
+        # Makes sure there are files to be renamed
+        if len(files) == 0:
+            message = f'{self.path} has no file to be rename.'
+            raise NoFileToRenameError(message)
+        else:
+            self.files = files
 
     @staticmethod
     def list_files(path):
@@ -291,8 +312,8 @@ class FileManager:
             if duplicate in self.files:
                 message = (f'Remove {duplicate.path} from '
                            'FileManager.files with '
-                           'FileManager.remove_duplicates before attempting to '
-                           'deleting it.')
+                           'FileManager.remove_duplicates before attempting '
+                           'to deleting it.')
                 raise DuplicateNotRemovedError(message)
             else:
                 os.remove(duplicate.path)
@@ -310,7 +331,7 @@ class FileManager:
             targets.append(file_.target)
 
         # Verify if the name of the file is unique or if its the first of a
-        # sequence of incrementing names.
+        # sequence of incrementing names
         for file_ in self.files:
             if file_.index == 1:
                 name = f'{file_.target.stem[:-1]}2{file_.target.suffix}'
@@ -318,6 +339,29 @@ class FileManager:
 
                 if target not in targets:
                     file_.target = file_.get_target(unique=True)
+
+                file_.resolved = True
+
+    def rename_files(self):
+        """Rename the files managed by this instance of FileManager. Raises
+        NoFileToRenameError if FileManager.rename_files was called before and
+        TargetNotResolvedError if FileManager.resolve_targets was not called
+        yet."""
+
+        if len(self.files) == 0:
+            message = ('FileManager.files is empty. There is no file to '
+                       'rename anymore')
+            raise NoFileToRenameError(message)
+
+        for file_ in self.files:
+            if not file_.resolved:
+                message = (f'Resolve {file_.path} target before attempting to '
+                           'rename it.')
+                raise TargetNotResolvedError(message)
+
+            file_.path.rename(file_.target)
+
+        self.files.clear()
 
 
 if __name__ == '__main__':
@@ -331,3 +375,4 @@ if __name__ == '__main__':
     # TODO: Explore the possibility of inject exif info into files that does
     # not have it already
     file_manager.resolve_targets()
+    file_manager.rename_files()

@@ -12,10 +12,10 @@ TESTS = pathlib.Path() / 'tests'
 SAMPLES = TESTS / 'samples'
 
 
-def clean_up():
-    """Removes all .jpg file in TESTS."""
+def clean_up(target=TESTS):
+    """Removes all .jpg file in the given target (default is TESTS)."""
 
-    for file_ in TESTS.iterdir():
+    for file_ in target.iterdir():
         if file_.suffix == '.jpg':
             os.remove(file_)
 
@@ -192,8 +192,8 @@ def samples_create_date():
 
     dates = []
     for create_date in create_dates:
-        # NOTE: I don't know why, but providing tz_info to datetime set the time
-        # zone off by a few minutes
+        # NOTE: Providing a tz_info to the datetime constructor set the time
+        # zone off by a few minutes, but using tzlocal localize does not
         date = datetime.datetime(*create_date)
         date = tz_info.localize(date)
         date = date.astimezone(rename.LOCAL_TZ)
@@ -260,13 +260,14 @@ def test_rename_3_samples(sample_1_create_date):
         assert sample.stem == f'{sample_1_create_date} {index + 1}'
 
 
-def copy_samples():
-    """Copy all the samples in SAMPLES to TESTS."""
+def copy_samples(destination=TESTS):
+    """Copy all the samples in SAMPLES to the given destination
+    (default is TESTS)."""
 
     # It is not necesssary to check if file_ is a file because SAMPLES
     # must contain only files
     for file_ in SAMPLES.iterdir():
-        shutil.copy2(file_, TESTS)
+        shutil.copy2(file_, destination)
 
 
 def copy_sample_n_times(times):
@@ -313,6 +314,23 @@ class TestFile:
 
 class TestFileManager:
     """Contains rename.FileManager tests."""
+
+    @staticmethod
+    def test_constructor_raises_exception():
+        """Ensures rename.FileManger will raise rename.NotFileToRenameError,
+        with the correct message, if the given directory is empty."""
+
+        temp = TESTS / 'temp'
+        temp.mkdir()
+
+        with pytest.raises(rename.NoFileToRenameError) as error:
+            rename.FileManager(temp)
+
+        message = f'{temp} has no file to be rename.'
+
+        assert error.value.args[0] == message
+
+        temp.rmdir()
 
     @staticmethod
     def test_find_duplicates_all_duplicates():
@@ -410,3 +428,60 @@ class TestFileManager:
         assert sorted(result) == sorted(expected)
 
         clean_up()
+
+    @staticmethod
+    def test_rename_files_raises_exception():
+        """Ensures FileManager.rename_files rasies
+        rename.TargetNotResolvedError if the targets have not been resolved
+        yet."""
+
+        copy_samples()
+
+        file_manager = rename.FileManager(TESTS)
+
+        with pytest.raises(rename.TargetNotResolvedError):
+            file_manager.rename_files()
+
+        clean_up()
+
+    @staticmethod
+    def test_rename_files(samples_create_date):
+        """Tests if FileManager.rename_files correctly renames all samples."""
+
+        temp = TESTS / 'temp'
+        temp.mkdir()
+        copy_samples(temp)
+
+        file_manager = rename.FileManager(temp)
+        file_manager.resolve_targets()
+        file_manager.rename_files()
+
+        result = [file_ for file_ in temp.iterdir()]
+        expected = [temp / (name + '.jpg') for name in samples_create_date]
+
+        assert sorted(result) == sorted(expected)
+
+        clean_up(temp)
+        temp.rmdir()
+
+    @staticmethod
+    def test_rename_files_subsequent_call():
+        """Tests if FileManager.rename_files raises rename.NoFileToRenameError,
+        with the correct message, when the file manager has been depleted."""
+
+        temp = TESTS / 'temp'
+        temp.mkdir()
+        copy_samples(temp)
+
+        file_manager = rename.FileManager(temp)
+        file_manager.resolve_targets()
+        file_manager.rename_files()
+
+        with pytest.raises(rename.NoFileToRenameError) as error:
+            file_manager.rename_files()
+
+        assert error.value.args[0] == ('FileManager.files is empty. There is '
+                                       'no file to rename anymore')
+
+        clean_up(temp)
+        temp.rmdir()
