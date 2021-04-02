@@ -340,7 +340,7 @@ class FileManager:
                 if target not in targets:
                     file_.target = file_.get_target(unique=True)
 
-                file_.resolved = True
+            file_.resolved = True
 
     def rename_files(self):
         """Rename the files managed by this instance of FileManager. Raises
