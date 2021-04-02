@@ -308,8 +308,8 @@ class TestFileManager:
         with pytest.raises(rename.NoFileToRenameError) as error:
             file_manager.rename_files()
 
-        assert error.value.args[0] == ('FileManager.files is empty. There is '
-                                       'no file to rename anymore')
+        assert error.value.args[0] == ('FileManager is depleted. There is no '
+                                       'file to be renamed')
 
         clean_up(temp)
         temp.rmdir()

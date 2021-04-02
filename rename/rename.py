@@ -59,9 +59,6 @@ class File:
         """Uses Exiftool to extract the file's create date or, if the file does
         not have exif info, gets the last time its metadata was modified."""
 
-        # TODO: check if the user has exiftool installed before starting to do
-        # all the work. Delete this comment after implementing the checking
-        # function
         args = ['exiftool', path, '-CreateDate', '-s', '-s', '-s']
         process = subprocess.run(args, capture_output=True)
         date_str = process.stdout.decode('utf-8')
@@ -103,6 +100,7 @@ class FileManager:
 
     path: pathlib.Path
     files: list = dataclasses.field(init=False)
+    depleted: bool = dataclasses.field(default=False, init=False)
 
     def __post_init__(self):
         files = FileManager.list_files(self.path)
@@ -167,7 +165,7 @@ class FileManager:
 
             targets.append(file_.target)
 
-        # Verify if the name of the file is unique or if its the first of a
+        # Verifies if the name of the file is unique or if its the first of a
         # sequence of incrementing names
         for file_ in self.files:
             if file_.index == 1:
@@ -185,9 +183,9 @@ class FileManager:
         TargetNotResolvedError if FileManager.resolve_targets was not called
         yet."""
 
-        if len(self.files) == 0:
-            message = ('FileManager.files is empty. There is no file to '
-                       'rename anymore')
+        if self.depleted:
+            message = ('FileManager is depleted. There is no file to be '
+                       'renamed')
             raise NoFileToRenameError(message)
 
         for file_ in self.files:
@@ -198,7 +196,7 @@ class FileManager:
 
             file_.path.rename(file_.target)
 
-        self.files.clear()
+        self.depleted = True
 
 
 def list_duplicates(duplicates):
@@ -226,6 +224,7 @@ if __name__ == '__main__':
     duplicates = file_manager.find_duplicates()
     list_duplicates(duplicates)
 
+    # TODO: Can I isolate the following into a testable function?
     if len(duplicates) != 0 and prompt_user('Delete duplicate files? (y/n) '):
         file_manager.remove_duplicates(duplicates)
         file_manager.delete_duplicates(duplicates)
@@ -234,11 +233,9 @@ if __name__ == '__main__':
     else:
         print('No duplicate file was removed.')
 
-    file_number = len(file_manager.files)
-
     # TODO: Explore the possibility of inject exif info into files that does
     # not have it already
     file_manager.resolve_targets()
     file_manager.rename_files()
 
-    print(f'Renamed {file_number} files.')
+    print(f'Renamed {len(file_manager.files)} files.')
