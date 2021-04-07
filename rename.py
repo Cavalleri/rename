@@ -33,7 +33,7 @@ if __name__ == '__main__':
     python = repository / '.venv' / 'bin' / 'python'
 
     try:
-        subprocess.run([python, rename, path], capture_output=True)
+        subprocess.run([python, rename, path])
     except FileNotFoundError as error:
         message = ('Make sure you created the virtual environment in the '
                    'project folder')
