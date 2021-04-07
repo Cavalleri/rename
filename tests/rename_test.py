@@ -112,6 +112,36 @@ def test_list_duplicates_no_duplicates(capsys):
     assert captured.out == 'No duplicate file was found\n'
 
 
+def test_prompt_user(capsys):
+    """Ensures rename.prompt_user outputs the correct message according to
+    the user's response."""
+
+    mocked_remove = rename.FileManager.remove_duplicates
+    rename.FileManager.remove_duplicates = lambda *a, **kw: a
+
+    mocked_delete = rename.FileManager.delete_duplicates
+    rename.FileManager.delete_duplicates = lambda *a, **kw: a
+
+    duplicates = list(range(10))
+    file_manager = rename.FileManager(SAMPLES)
+
+    # Test positive answer
+    rename.input = lambda *a, **kw: 'y'
+    rename.prompt_user(duplicates, file_manager)
+    captured = capsys.readouterr()
+    assert captured.out == '10 duplicate files deleted.\n'
+
+    # Test negative answer
+    rename.input = lambda *a, **kw: 'n'
+    rename.prompt_user(duplicates, file_manager)
+    captured = capsys.readouterr()
+    assert captured.out == 'No duplicate file was removed.\n'
+
+    rename.input = input
+    rename.FileManager.remove_duplicates = mocked_remove
+    rename.FileManager.delete_duplicates = mocked_delete
+
+
 class TestFile:
     """Contains rename.File tests."""
 

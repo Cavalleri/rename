@@ -215,10 +215,21 @@ def list_duplicates(duplicates):
             print(duplicate.path)
 
 
-def prompt_user(message):
-    """Prompts the user to answer yes or no for the given message."""
+def prompt_user(duplicates, file_manager):
+    """Ask the user if he wants to delete the duplicate files found. If the
+    answer is positive, makes the FileManager instance delete the duplicate
+    files."""
 
-    return True if input(message) == 'y' else False
+    if len(duplicates) != 0:
+        answer = input('Delete duplicate files? (y/n) ')
+
+        if answer in ['y', 'Y', 's', 'S']:
+            file_manager.remove_duplicates(duplicates)
+            file_manager.delete_duplicates(duplicates)
+
+            print(f'{len(duplicates)} duplicate files deleted.')
+        else:
+            print('No duplicate file was removed.')
 
 
 if __name__ == '__main__':
@@ -227,15 +238,7 @@ if __name__ == '__main__':
 
     duplicates = file_manager.find_duplicates()
     list_duplicates(duplicates)
-
-    # TODO: Can I isolate the following into a testable function?
-    if len(duplicates) != 0 and prompt_user('Delete duplicate files? (y/n) '):
-        file_manager.remove_duplicates(duplicates)
-        file_manager.delete_duplicates(duplicates)
-
-        print(f'{len(duplicates)} duplicate files deleted.')
-    else:
-        print('No duplicate file was removed.')
+    prompt_user(duplicates, file_manager)
 
     # TODO: Explore the possibility of inject exif info into files that does
     # not have it already
