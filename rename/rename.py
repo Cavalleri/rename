@@ -93,6 +93,17 @@ class File:
         self.index += 1
         self.target = self.get_target()
 
+    def rename(self):
+        """Rename the File. Raises TargetNotResolvedError if the target was not
+        resolved by the FileManager."""
+
+        if not self.resolved:
+            message = (f'Resolve {self.path} target before attempting to '
+                       'rename it.')
+            raise TargetNotResolvedError(message)
+
+        self.path.rename(self.target)
+
 
 @dataclasses.dataclass
 class FileManager:
@@ -179,9 +190,7 @@ class FileManager:
 
     def rename_files(self):
         """Rename the files managed by this instance of FileManager. Raises
-        NoFileToRenameError if FileManager.rename_files was called before and
-        TargetNotResolvedError if FileManager.resolve_targets was not called
-        yet."""
+        NoFileToRenameError if the FileManager was depleted."""
 
         if self.depleted:
             message = ('FileManager is depleted. There is no file to be '
@@ -189,12 +198,7 @@ class FileManager:
             raise NoFileToRenameError(message)
 
         for file_ in self.files:
-            if not file_.resolved:
-                message = (f'Resolve {file_.path} target before attempting to '
-                           'rename it.')
-                raise TargetNotResolvedError(message)
-
-            file_.path.rename(file_.target)
+            file_.rename()
 
         self.depleted = True
 

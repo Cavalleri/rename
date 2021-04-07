@@ -31,11 +31,17 @@ def copy_samples(destination=TESTS):
 
 
 def copy_sample_n_times(times):
-    """Copy SAMPLES/sample 1.jpg to TESTS n times."""
+    """Copy SAMPLES/sample 1.jpg to TESTS n times. Returns a list of the
+    target paths to facilitate testing."""
+
+    targets = []
 
     for index in range(times):
         target = TESTS / f'sample {index + 1}.jpg'
         shutil.copy2(SAMPLES / 'sample 1.jpg', target)
+        targets.append(target)
+
+    return targets
 
 
 @pytest.fixture
@@ -138,6 +144,44 @@ class TestFile:
         target = SAMPLES / f'{samples_create_date[0]} 2.jpg'
 
         assert file_.target == target
+
+    @staticmethod
+    def test_rename(samples_create_date):
+        """Tests if File.rename correctly renames the file."""
+
+        copy_samples()
+        files = [rename.File(file_) for file_ in TESTS.iterdir()
+                 if file_.suffix == '.jpg']
+
+        for file_ in files:
+            file_.resolved = True
+            file_.rename()
+
+        expected = [pathlib.Path(TESTS) / f'{date} 1.jpg' for date
+                    in samples_create_date]
+
+        result = [sample for sample in TESTS.iterdir()
+                  if sample.suffix == '.jpg']
+
+        assert sorted(result) == sorted(expected)
+
+        clean_up()
+
+    @staticmethod
+    def test_rename_raises_exception():
+        """Ensures rename.File.rename raises rename.TargetNotResolvedError
+        if the targets have not been resolved yet."""
+
+        path, *__ = copy_sample_n_times(1)
+        file_ = rename.File(path)
+
+        with pytest.raises(rename.TargetNotResolvedError) as error:
+            file_.rename()
+
+        assert error.value.args[0] == (f'Resolve {path} target before '
+                                       'attempting to rename it.')
+
+        clean_up()
 
 
 class TestFileManager:
@@ -258,41 +302,6 @@ class TestFileManager:
         clean_up()
 
     @staticmethod
-    def test_rename_files_raises_exception():
-        """Ensures FileManager.rename_files rasies
-        rename.TargetNotResolvedError if the targets have not been resolved
-        yet."""
-
-        copy_samples()
-
-        file_manager = rename.FileManager(TESTS)
-
-        with pytest.raises(rename.TargetNotResolvedError):
-            file_manager.rename_files()
-
-        clean_up()
-
-    @staticmethod
-    def test_rename_files(samples_create_date):
-        """Tests if FileManager.rename_files correctly renames all samples."""
-
-        temp = TESTS / 'temp'
-        temp.mkdir()
-        copy_samples(temp)
-
-        file_manager = rename.FileManager(temp)
-        file_manager.resolve_targets()
-        file_manager.rename_files()
-
-        result = [file_ for file_ in temp.iterdir()]
-        expected = [temp / (name + '.jpg') for name in samples_create_date]
-
-        assert sorted(result) == sorted(expected)
-
-        clean_up(temp)
-        temp.rmdir()
-
-    @staticmethod
     def test_rename_files_subsequent_call():
         """Tests if FileManager.rename_files raises rename.NoFileToRenameError,
         with the correct message, when the file manager has been depleted."""
@@ -304,6 +313,8 @@ class TestFileManager:
         file_manager = rename.FileManager(temp)
         file_manager.resolve_targets()
         file_manager.rename_files()
+
+        assert file_manager.depleted is True
 
         with pytest.raises(rename.NoFileToRenameError) as error:
             file_manager.rename_files()
