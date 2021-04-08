@@ -56,20 +56,29 @@ class File:
 
     @staticmethod
     def get_date(path):
-        """Uses Exiftool to extract the file's create date or, if the file does
-        not have exif info, gets the last time its metadata was modified."""
+        """Gets the file oldest available date of creation or modification."""
 
-        args = ['exiftool', path, '-CreateDate', '-s', '-s', '-s']
+        # List all dates related to the creation or modification of the file,
+        # then sort the list and localize the oldest date
+        args = ['exiftool', path, '-CreateDate', '-ModifyDate',
+                '-FileModifyDate', '-s', '-s', '-s']
         process = subprocess.run(args, capture_output=True)
-        date_str = process.stdout.decode('utf-8')
+        output = process.stdout.decode('utf-8')
+
+        dates = []
+        for str_ in output.split('\n')[:-1]:
+            # Slice off the time zone part
+            if len(str_) > 19:
+                str_ = str_[:-6]
+
+            date = datetime.datetime.strptime(str_, '%Y:%m:%d %H:%M:%S')
+            dates.append(date)
 
         stamp = path.stat().st_ctime
+        date = datetime.datetime.fromtimestamp(stamp)
+        dates.append(date)
 
-        try:
-            date = datetime.datetime.strptime(date_str, '%Y:%m:%d %H:%M:%S\n')
-        except ValueError:
-            date = datetime.datetime.fromtimestamp(stamp)
-
+        date = sorted(dates)[0]
         date = LOCAL_TZ.localize(date)
 
         return date
