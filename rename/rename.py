@@ -127,8 +127,9 @@ class FileManager:
 
         # Makes sure there are files to be renamed
         if len(files) == 0:
-            message = f'{self.path} has no file to be rename.'
-            raise NoFileToRenameError(message)
+            message = f'No file was found in {self.path} to be renamed.'
+            print(message + '\n' + '-' * len(message))
+            raise NoFileToRenameError(f'{self.path} has no file to rename.')
         else:
             self.files = sorted(files)
 
