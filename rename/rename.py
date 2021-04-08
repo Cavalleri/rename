@@ -1,5 +1,5 @@
+import dataclasses
 import datetime
-import hashlib
 import os
 import pathlib
 import subprocess
@@ -10,163 +10,247 @@ import tzlocal
 LOCAL_TZ = tzlocal.get_localzone()
 
 
-def digest(food):
-    """Produces a SHA1 string for the given bytes."""
-
-    sha1 = hashlib.sha1()
-    sha1.update(food)
-    return sha1.hexdigest()
+class DuplicateNotRemovedError(Exception):
+    """Exception raised when the user attempts to delete a duplicate file that
+    was not removed from FileManager.files."""
+    pass
 
 
-def search_duplicates(path):
-    """Compares SHA 1 hashes to find identical files. Returns a list of the
-    original and duplicate files paths."""
+class TargetNotResolvedError(Exception):
+    """Exception raised when the user attempts to rename files before calling
+    FileManager.resolve_targets."""
+    pass
 
-    duplicates = []
-    hashes = {}
 
-    for file_ in path.iterdir():
-        if file_.is_file():
-            with file_.open(mode='rb') as food:
-                hash_ = digest(food.read())
+class NoFileToRenameError(Exception):
+    """Exception raised when FileManager.files is empty because it was depleted
+    by previously calling FileManager.rename_files or because the given
+    directory has no files to rename."""
+    pass
 
-            if hash_ in hashes.keys():
-                duplicates.append((file_, hashes[hash_]))
+
+@dataclasses.dataclass(order=True)
+class File:
+    """Keeps track of the path, hash, date of creation and name of a file."""
+
+    path: pathlib.Path
+    hash_: int = dataclasses.field(init=False)
+    date: datetime.datetime = dataclasses.field(init=False)
+    target: pathlib.Path = dataclasses.field(init=False)
+    index: int = 1
+    resolved: bool = dataclasses.field(default=False, init=False)
+
+    def __post_init__(self):
+        self.hash_ = File.get_hash(self.path)
+        self.date = File.get_date(self.path)
+        self.target = self.get_target()
+
+    @staticmethod
+    def get_hash(path):
+        """Hashes the file using the built-in hash function."""
+
+        with path.open(mode='rb') as file_:
+            bytes_ = file_.read()
+
+        return hash(bytes_)
+
+    @staticmethod
+    def get_date(path):
+        """Gets the file oldest available date of creation or modification."""
+
+        # Lists all dates related to the creation or modification of the file,
+        # then sorts the list and localizes the oldest date
+        args = ['exiftool', path, '-CreateDate', '-ModifyDate',
+                '-FileModifyDate', '-s', '-s', '-s']
+        process = subprocess.run(args, capture_output=True)
+        output = process.stdout.decode('utf-8')
+
+        dates = []
+        for str_ in output.split('\n')[:-1]:
+            # Slices off the time zone part
+            if len(str_) > 19:
+                str_ = str_[:-6]
+
+            date = datetime.datetime.strptime(str_, '%Y:%m:%d %H:%M:%S')
+            dates.append(date)
+
+        stamp = path.stat().st_ctime
+        date = datetime.datetime.fromtimestamp(stamp)
+        dates.append(date)
+
+        date = sorted(dates)[0]
+        date = LOCAL_TZ.localize(date)
+
+        return date
+
+    def get_target(self, unique=False):
+        """Makes the target path used to rename the file later. If unique is
+        True, File.index will not be appended to the path stem."""
+
+        date = self.date.strftime('%Y%m%d %H%M%S %z')
+
+        if unique:
+            name = f'{date}{self.path.suffix}'
+        else:
+            name = f'{date} {self.index}{self.path.suffix}'
+
+        return self.path.parent / name
+
+    def increment_target(self):
+        """Increments File.index and remakes File.target."""
+
+        self.index += 1
+        self.target = self.get_target()
+
+    def rename(self):
+        """Rename the File. Raises TargetNotResolvedError if the target was not
+        resolved by the FileManager."""
+
+        if not self.resolved:
+            message = (f'Resolve {self.path} target before attempting to '
+                       'rename it.')
+            raise TargetNotResolvedError(message)
+
+        self.path.rename(self.target)
+
+
+@dataclasses.dataclass
+class FileManager:
+    """Manages File instances."""
+
+    path: pathlib.Path
+    files: list = dataclasses.field(init=False)
+    depleted: bool = dataclasses.field(default=False, init=False)
+
+    def __post_init__(self):
+        files = FileManager.list_files(self.path)
+
+        # Makes sure there are files to be renamed
+        if len(files) == 0:
+            message = f'No file was found in {self.path} to be renamed.'
+            print(message + '\n' + '-' * len(message))
+            raise NoFileToRenameError(f'{self.path} has no file to rename.')
+        else:
+            self.files = sorted(files)
+
+    @staticmethod
+    def list_files(path):
+        """Lists all files in the given directory as File instances."""
+
+        return [File(file_) for file_ in path.iterdir() if file_.is_file()]
+
+    def find_duplicates(self):
+        """Compares the hash of File instances to find identical copies."""
+
+        hashes = []
+        duplicates = []
+
+        for file_ in self.files:
+            if file_.hash_ in hashes:
+                duplicates.append(file_)
             else:
-                hashes[hash_] = file_
+                hashes.append(file_.hash_)
 
-    return duplicates
+        return duplicates
 
-
-def delete_duplicates(duplicates):
-    """Lists the duplicate files found and prompts the user to delete them. If
-    the duplicate files are not deleted, they will be renamed."""
-
-    if len(duplicates) == 0:
-        print('No duplicates files were found')
-    else:
-        print('The following files are duplicated:')
+    def remove_duplicates(self, duplicates):
+        """Removes duplicate files from FileManager.files, preventing them
+        to be renamed in the future."""
 
         for duplicate in duplicates:
-            print(*duplicate)
+            self.files.remove(duplicate)
 
-        if input('Delete duplicate files? (y/n) ') == 'y':
-            for duplicate in duplicates:
-                os.remove(duplicate[0])
+    def delete_duplicates(self, duplicates):
+        """Deletes duplicate files. Raise DuplicateNotRemovedError if the
+        duplicate is an element of FileManager.files."""
 
-            print(len(duplicates), 'duplicate files deleted')
-        else:
-            print('No duplicate file was deleted')
+        for duplicate in duplicates:
+            if duplicate in self.files:
+                message = (f'Remove {duplicate.path} from '
+                           'FileManager.files with '
+                           'FileManager.remove_duplicates before attempting '
+                           'to deleting it.')
+                raise DuplicateNotRemovedError(message)
+            else:
+                os.remove(duplicate.path)
+
+    def resolve_targets(self):
+        """Resolve targets collisions by incrementing indexes and finding
+        unique names."""
+
+        targets = []
+
+        for file_ in self.files:
+            while file_.target in targets:
+                file_.increment_target()
+
+            targets.append(file_.target)
+
+        # Verifies if the name of the file is unique or if its the first of a
+        # sequence of incrementing names
+        for file_ in self.files:
+            if file_.index == 1:
+                name = f'{file_.target.stem[:-1]}2{file_.target.suffix}'
+                target = file_.target.parent / name
+
+                if target not in targets:
+                    file_.target = file_.get_target(unique=True)
+
+            file_.resolved = True
+
+    def rename_files(self):
+        """Rename the files managed by this instance of FileManager. Raises
+        NoFileToRenameError if the FileManager was depleted."""
+
+        if self.depleted:
+            message = ('FileManager is depleted. There is no file to be '
+                       'renamed')
+            raise NoFileToRenameError(message)
+
+        for file_ in self.files:
+            file_.rename()
+
+        self.depleted = True
 
 
-def get_create_date(file_):
-    """Gets file create date if exif is present. If the file has no exif,
-    datetime will raise ValueError. For this function to work the user must
-    have exiftool installed, otherwise it will raise FileNotFoundError."""
+def list_duplicates(duplicates):
+    """Prints a list of all duplicate files found."""
 
-    args = ['exiftool', file_, '-CreateDate', '-s', '-s', '-s']
-    try:
-        process = subprocess.run(args, capture_output=True)
-    except FileNotFoundError as error:
-        message = ('Could not run Exiftool. Make sure you have Exiftool '
-                   'installed')
-        print(message + '\n' + '-' * len(message))
-        raise error
-
-    create_date = process.stdout
-
-    return datetime.datetime.strptime(create_date.decode('utf-8'),
-                                      '%Y:%m:%d %H:%M:%S\n')
-
-
-def get_modified_date(file_):
-    """Gets the most recent metadata change on Unix or the time of creation
-    on Windows."""
-
-    modified_date = file_.stat().st_ctime
-    return datetime.datetime.fromtimestamp(modified_date)
-
-
-def get_name(file_):
-    """Tries to get file's EXIF create date. If the file doesn't have EXIF,
-    gets file's modified date. Returns the date and the local timezone offset
-    as a string."""
-
-    try:
-        date = get_create_date(file_)
-    except ValueError:
-        date = get_modified_date(file_)
-
-    date = LOCAL_TZ.localize(date)
-    return date.strftime('%Y%m%d %H%M%S %z')
-
-
-def get_target(file_, counter=None):
-    """Builds the target path used to rename the file. Counter is a positive
-    integer appended to the name when given."""
-
-    name = get_name(file_)
-
-    if counter is None:
-        target = file_.parent / (name + file_.suffix)
+    if len(duplicates) == 0:
+        print('No duplicate file was found')
     else:
-        target = file_.parent / (name + f' {counter}' + file_.suffix)
+        print('Found the following duplicate files:')
 
-    return target
+        for duplicate in duplicates:
+            print(duplicate.path)
 
 
-def rename_file(file_):
-    """Renames the file. If other file already has the same name, a positive
-    integer will be appended to the end of the name."""
+def prompt_user(duplicates, file_manager):
+    """Ask the user if he wants to delete the duplicate files found. If the
+    answer is positive, makes the FileManager instance delete the duplicate
+    files."""
 
-    counter = 1
-    target = get_target(file_, counter)
+    if len(duplicates) != 0:
+        answer = input('Delete duplicate files? (y/n) ')
 
-    if target.stem == file_.stem:
-        print("BUGUE BUGUE BUGUE BUGUE")
+        if answer in ['y', 'Y', 's', 'S']:
+            file_manager.remove_duplicates(duplicates)
+            file_manager.delete_duplicates(duplicates)
 
-    while target.exists():
-        counter += 1
-        target = get_target(file_, counter)
-
-    if counter == 1:
-        target = get_target(file_)
-
-        if target.exists():
-            new_target = get_target(target, 1)
-            # NOTE: The following is the buggy line. If the following renames
-            # a file, the rename loop will fail to find the renamed file
-            target.rename(new_target)
-            target = get_target(file_, 2)
-
-    file_.rename(target)
+            print(f'{len(duplicates)} duplicate files deleted.')
+        else:
+            print('No duplicate file was removed.')
 
 
 if __name__ == '__main__':
-    try:
-        path = pathlib.Path(sys.argv[1])
-    except IndexError as error:
-        message = 'Usage: rename.py <path>'
-        print(message + '\n' + '-' * len(message))
-        raise error
+    path = pathlib.Path(sys.argv[1])
+    file_manager = FileManager(path)
 
-    duplicates = search_duplicates(path)
-    delete_duplicates(duplicates)
+    duplicates = file_manager.find_duplicates()
+    list_duplicates(duplicates)
+    prompt_user(duplicates, file_manager)
 
-    files = list(path.iterdir())
-    for file_ in files:
-        if file_.is_file():
-            # BUG: When a file has the same name of another file, the other
-            # will be renamed too, and, when the loop loops over the other, it
-            # will no longer exists because it has been renamed.
-            # Solution: remove renamed files from the files list. To acomplish
-            # this, rename_files must return the other file renamed (I leaved a
-            # note where the buggy code is) and them it must be removed from
-            # the files list
-            rename_file(file_)
+    file_manager.resolve_targets()
+    file_manager.rename_files()
 
-    # NOTE: Instead of using the modified time, which will modify the file
-    # metada, changing the modified time, try to inject the modified time as
-    # EXIF created time, preventing future renames to push the name further
-    # from the real create date
-    print(len(files), 'files renamed.')
+    print(f'Renamed {len(file_manager.files)} files.')
