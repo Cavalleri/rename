@@ -58,8 +58,8 @@ class File:
     def get_date(path):
         """Gets the file oldest available date of creation or modification."""
 
-        # List all dates related to the creation or modification of the file,
-        # then sort the list and localize the oldest date
+        # Lists all dates related to the creation or modification of the file,
+        # then sorts the list and localizes the oldest date
         args = ['exiftool', path, '-CreateDate', '-ModifyDate',
                 '-FileModifyDate', '-s', '-s', '-s']
         process = subprocess.run(args, capture_output=True)
@@ -67,7 +67,7 @@ class File:
 
         dates = []
         for str_ in output.split('\n')[:-1]:
-            # Slice off the time zone part
+            # Slices off the time zone part
             if len(str_) > 19:
                 str_ = str_[:-6]
 
@@ -249,8 +249,6 @@ if __name__ == '__main__':
     list_duplicates(duplicates)
     prompt_user(duplicates, file_manager)
 
-    # TODO: Explore the possibility of inject exif info into files that does
-    # not have it already
     file_manager.resolve_targets()
     file_manager.rename_files()
 
