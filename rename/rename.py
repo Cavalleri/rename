@@ -71,8 +71,10 @@ class File:
             if len(str_) > 19:
                 str_ = str_[:-6]
 
-            date = datetime.datetime.strptime(str_, '%Y:%m:%d %H:%M:%S')
-            dates.append(date)
+            year = int(str_[:4])
+            if year > datetime.MINYEAR and year < datetime.MAXYEAR:
+                date = datetime.datetime.strptime(str_, '%Y:%m:%d %H:%M:%S')
+                dates.append(date)
 
         stamp = path.stat().st_ctime
         date = datetime.datetime.fromtimestamp(stamp)
