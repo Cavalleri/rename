@@ -228,7 +228,7 @@ class TestFileManager:
         with pytest.raises(rename.NoFileToRenameError) as error:
             rename.FileManager(temp)
 
-        message = f'{temp} has no file to be rename.'
+        message = f'{temp} has no file to rename.'
 
         assert error.value.args[0] == message
 
